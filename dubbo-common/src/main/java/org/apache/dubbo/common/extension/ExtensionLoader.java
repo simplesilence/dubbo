@@ -84,6 +84,11 @@ public class ExtensionLoader<T> {
 
     private static final Pattern NAME_SEPARATOR = Pattern.compile("\\s*[,]+\\s*");
 
+
+    /**
+     * 解释一下，为什么ExtensionLoader需要一个map存储，因为一个class接口type对应一个ExtensionLoader，
+     * 这个属性，可以缓存已经new过得spi接口对应ExtensionLoader，下次getExtensionLoader直接从此缓存中取。
+     */
     private static final ConcurrentMap<Class<?>, ExtensionLoader<?>> EXTENSION_LOADERS = new ConcurrentHashMap<>();
 
     private static final ConcurrentMap<Class<?>, Object> EXTENSION_INSTANCES = new ConcurrentHashMap<>();
@@ -129,6 +134,7 @@ public class ExtensionLoader<T> {
                     ") is not an extension, because it is NOT annotated with @" + SPI.class.getSimpleName() + "!");
         }
 
+        // 一个spi接口type对应一个ExtensionLoader
         ExtensionLoader<T> loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         if (loader == null) {
             EXTENSION_LOADERS.putIfAbsent(type, new ExtensionLoader<T>(type));
@@ -374,6 +380,8 @@ public class ExtensionLoader<T> {
     /**
      * Find the extension with the given name. If the specified name is not found, then {@link IllegalStateException}
      * will be thrown.
+     *
+     * 把此方法中的extension理解为接口的实现类，这里翻译为扩展点
      */
     @SuppressWarnings("unchecked")
     public T getExtension(String name) {
@@ -381,7 +389,7 @@ public class ExtensionLoader<T> {
             throw new IllegalArgumentException("Extension name == null");
         }
         if ("true".equals(name)) {
-            return getDefaultExtension();
+            return getDefaultExtension();// 获取接口默认的实现类，就是接口上@SPI注解的默认值，该值对应spi文件的key
         }
         final Holder<Object> holder = getOrCreateHolder(name);
         Object instance = holder.get();
@@ -389,7 +397,10 @@ public class ExtensionLoader<T> {
             synchronized (holder) {
                 instance = holder.get();
                 if (instance == null) {
+                    // 创建name对应的实现类的实例
+                    // 第一次调用是框架自己调用的，name为spi，之后就是我们指定的name
                     instance = createExtension(name);
+
                     holder.set(instance);
                 }
             }
